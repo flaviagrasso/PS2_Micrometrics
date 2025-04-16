@@ -1,4 +1,3 @@
-/* Template of do-file in Stata to answer problem set */
 /* Group number: 11 */
 /* Group composition: Claudia Ambrosino, Flavia Grasso and Titouan Renault */
 
@@ -15,8 +14,8 @@ if ("`user'" == "grasso") {
     global filepath "/Users/grasso/Documents/Bocconi ESS/2024-2025/Semester 2/20295 - Microeconometrics/Problem Set 2"
 }
 
-if ("`user'" == "B") {
-    global filepath "/FILE/PATH/B/"
+if ("`user'" == "user") {
+    global filepath "C:/Users/user/Desktop/Microeconometrics/Problem set 2"
 }
 
 if ("`user'" == "C") {
