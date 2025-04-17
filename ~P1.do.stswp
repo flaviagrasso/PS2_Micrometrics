@@ -103,7 +103,7 @@ twoway (line div_rate1 year,  lcolor(black) lpattern(solid)) ///
 *Add comment
 
 /* Do your results support the assumption of parallel trends? 
-seems ok - aussi dans le 2e dis que apres 1978 la diff a monte alors qu'avant ct assez stable
+seems ok - aussi dans le 2e dis que apres 1978 la diff a monte tabdis qu'avant ct assez stable
 */
 
 *****************************************************************************
