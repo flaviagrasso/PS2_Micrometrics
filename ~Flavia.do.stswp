@@ -34,6 +34,8 @@ display "$data"
 global output "${filepath}/output"
 display "$output"
 
+
+
 ******************************************************************************
 ******************************************************************************
                                 *Exercise 1*
@@ -48,7 +50,6 @@ Because divorce rates are group averages for each state, we want to account for 
 We use analytic weights when working with group-mean observations, this ensures that results are representative and it allows to give relatively more weight to the averages computed on larger samples, which would result in more precise estimates of divorce rates.
 */
 
-*Cluster standard errors at the state level in regressions
 
 *****************************************************************************
 /*Question b*/
@@ -100,39 +101,34 @@ twoway (line div_rate1 year,  lcolor(black) lpattern(solid)) ///
 	xline(1969, lcolor(gray) lpattern(dash)) ///
 	xsize(12) ysize(8)
 
-*Add comment
 
 /* Do your results support the assumption of parallel trends? 
-seems ok - aussi dans le 2e dis que apres 1978 la diff a monte alors qu'avant ct assez stable
+The first graph compares states that reformed in 1968 and 1988 and those that did not. We see that before the wave of reform, both samples seem to follow the same upward trend, supporting the parallel trends assumption. 
+The second graph compares states that adopted the unilateral divorce law between 69 and 73 to the late reform states, that adopted it in 2000. Again, the trend in divorce rates seems to be the same across the control and reform states, supporting the parallel trends assumption.  
 */
 
 *****************************************************************************
 /*Question c*/
 *****************************************************************************
+
 use "$data/pset_4.dta", clear
 
 keep if year == 1968 | year == 1978
-keep if (lfdivlaw >=1968 & lfdivlaw<=1973) | (lfdivlaw==2000) //you should compare states adopting the unilateral divorce law between 1969 and 1973 to the ones that introduced it in the year 2000."
-
+keep if (lfdivlaw >=1968 & lfdivlaw<=1973) | (lfdivlaw==2000)
 gen UNILATERAL = (lfdivlaw >= 1969 & lfdivlaw <= 1973)
 gen POST = (year==1978)
 gen POST_UNILATERAL = POST*UNILATERAL
 
-/*Point i*/
-
-*Pooled OLS 
+* Regression i: pooled OLS
 reg div_rate POST POST_UNILATERAL [aweight = stpop], vce(robust)
-*Should we save the output?
 
-*Diff-in-diff specification
+*Regression ii: diff-in-diff specification
 reg div_rate POST UNILATERAL POST_UNILATERAL [aweight=stpop], vce(robust)
-
-*Based on the graphs you created in section (a), could you say something about the difference in the coefficients from regressions (i) and (ii)? What is the effect of introducing unilateral divorce laws according to this analysis?
 
 
 /* The coefficients between regression i and ii have significant differences. In the pooled OLS, the estimate for post_unilateral is significantly greater than 0, suggesting that the introduction of the unilateral law has a positive effect on divorce rates. However, when we include the variable unilateral, accounting for state fixed effects, the estimate for post_unilateral reduces to -.0050148, and becomes insignificant (p-value=0.993). The difference-in-difference accounts for pre-existing differences in divorce rates between states whereas the pooled OLS estimates the difference in outcomes between the treatment and control groups in 1978 (the post year). This positive bias comes from selection of states in the treatment group, as states adopting the law generally faced higher divorce rates. */
  
-
+ 
 *****************************************************************************
 /*Question d*/
 *****************************************************************************
@@ -151,7 +147,7 @@ sum div_rate if UNILATERAL==0 & POST==0 [aweight=stpop]
 scalar AVG_Y_0_0 = r(mean)
 
 matrix TABLE_1 = J(3,3,.)
-matrix colnames TABLE_1 = "UNILATERAL=1" "UNILATERAL=0" "Difference 2"
+matrix colnames TABLE_1 = "UNILATERAL=1 " "UNILATERAL=0 " "Difference 2"
 matrix rownames TABLE_1 = "POST=1" "POST=0" "Difference 1"
 
 matrix TABLE_1[1,1] = AVG_Y_1_1   // POST = 1, UNILATERAL = 1
@@ -172,17 +168,6 @@ putexcel set "$output/TABLE_1.xlsx", sheet("DiD Matrix") replace
 putexcel A2=matrix(TABLE_1), names nformat(number_d2) 
 
 
-
-
-
-***************From now on: code TO EDIT still
-
-
-
-
-
-
-
 *****************************************************************************
 /*Question e*/
 *****************************************************************************
@@ -191,107 +176,36 @@ use "$data/pset_4.dta", clear
 
 encode st, gen(st_id)
 drop st
-
 xtset st_id year
-keep if year >= 1956 & year <= 1988
 
+keep if year >= 1956 & year <= 1988
 gen IMP_UNILATERAL = (lfdivlaw <= year)
 
-/*Point i*/
+forval i=1/51{
+	bysort st_id (year): gen t_`i'=_n if st_id==`i' 
+	replace t_`i'=0 if t_`i'==.
+	bysort st_id (year): gen t2_`i'=_n^2 if st_id==`i' 
+	replace t2_`i'=0 if t2_`i'==.
+}
+
+
+/* Regression i*/
 reg div_rate IMP_UNILATERAL i.st_id i.year [aweight = stpop], vce(cluster st_id)
 
+/* Regression ii */
+reg div_rate IMP_UNILATERAL i.st_id i.year t_* [aweight = stpop], vce(cluster st_id)
 
-gen t = year - 1956
-gen t2 = t^2
+/* Regression iii */
+reg div_rate IMP_UNILATERAL i.st_id i.year t_* t2_* [aweight = stpop], vce(cluster st_id)
 
-/*Point ii*/
-reg div_rate IMP_UNILATERAL i.year c.t##i.st_id [aweight=stpop]
 
-/*Point iii*/
-reg div_rate IMP_UNILATERAL i.year c.t##i.st_id c.t2##i.st_id [aweight=stpop]
+/* The first regression controls for state and year differences yiels an estimate of -.055 suggesting that the introduction of unilateral laws decreased divorce rates by .055‰ but the result is very insignificant (p-value = .718). There is no clear evidence that unilateral divorce law had an effect on divorce rates in this regression.
+The second regression adds state-specific linear time trends to regression i. The estimate for IMP_UNILATERAL goes up to 0.477, and the coefficient is statistically significant at the 5%. So once we control for linear time trends the regression finds a significant increase of 0.477 divorces per 1000 people after the unilateral divorce law was implemented. 
+The third regression controls for both state-specific linear and quadratic time trends (in addition to state and year fixed effects). Here, the coefficient for unilateral is 0.33 and is also statistically significant.
 
-****************Point f************************
+Because the initial regression returns such different coefficients than the second/third regression, it points to potential omitted variable bias in the first regression. If there are unobserved state specific time trends in divorce rates that are correlated with the timing of divorce law reforms, omitting them will bias the estimated effect of unilateral divorce laws. Friedberg argues that these trends may reflect social and demographic shifts.
 
-use "$data/pset_4.dta", clear
-
-keep if year >= 1956 & year <= 1988
-gen IMP_UNILATERAL = (lfdivlaw <= year)
-encode st, gen(st_id)
-
-* Create simulated observations
-clear
-set obs 6
-gen obs = _n
-gen state = floor(.9 + obs/3)
-bysort state: gen year = _n
-gen D = state == 1 & year == 3
-replace D = 1 if state == 2 & (year == 2 | year == 3)
-
-*Creates simulated outcomes
-gen Y  = 0.1 + 0.02*(year==2) + 0.05*(D==1) + runiform()/100
-gen Y2 = 0.1 + 0.02*(year==2) + 0.05*(D==1) + 0.3*(state==2 & year==3) + runiform()/100
-gen Y3 = 0.1 + 0.02*(year==2) + 0.05*(D==1) + 0.4*(state==2 & year==3) + runiform()/100
-gen Y4 = 0.1 + 0.02*(year==2) + 0.05*(D==1) + 0.5*(state==2 & year==3) + runiform()/100
-
-reg Y D i.state i.year 
-reg Y2 D i.state i.year
-reg Y3 D i.state i.year
-reg Y4 D i.state i.year
-
-* Is it possible to estimate the treatment coefficient consistently in each of these cases?
-
-****************Point g************************
-twowayfeweights Y state year D, type(feTR)
-twowayfeweights Y2 state year D, type(feTR)
-twowayfeweights Y3 state year D, type(feTR)
-twowayfeweights Y4 state year D, type(feTR)
-
-* Can you explain why the sign of the estimated effect has changed between the regression on Y and the one on Y 4?
-
-****************Point h************************
-****************Point i************************
-ssc install bacondecomp
-
-sort state year
-gen init_stpop = .
-bysort state (year): replace init_stpop = stpop if _n == 1
-bysort state: replace init_stpop = init_stpop[_n-1] if missing(init_stpop)
-
-**************Point ii*************************
-reg div_rate IMP_UNILATERAL i.st_id i.year [aweight = init_stpop]
-
-**************Point iii*************************
-bacondecomp div_rate imp_unilateral [aweight = init_stpop]
-
-*************Point i*****************************
-xtset st_id year
-
-* lfdivlaw indicates year of introduction
-gen relative_udl = year - lfdivlaw
-
-*Create dummy for states which have adopted the unilateral divorce laws after the period of interest
-
-*Check the date is 1988
-
-gen never_udl = (lfdivlaw > 1988)
-
-tab relative_udl
-
-*Creates dummies for leads and lags
-forvalues k = 10(-1)2 {
-gen D_`k' = relative_udl == -`k'
-}
-forvalues k = 0/15 {
-gen D`k' = relative_udl == `k'
-}
+The estimates would be the same if the parallel trends assumption held perfectly, as the divorce time trends would be identical across reformed and control states.  
+ */
  
-reghdfe div_rate D_* D0-15 [aweight=stpop], absorb (st_id year) vce (clusted st_id)
-
-reghdfe div_rate D_* D0-15 [aweight=stpop], absorb (st_id year st_id*year) vce (clusted st_id)
-
-reghdfe div_rate D_* D0-15 [aweight=stpop], absorb (st_id year st_id*year) vce (clusted st_id)
-
-
-
-
-
+ 
